@@ -9,8 +9,12 @@ export interface SessionData {
   isLoggedIn: boolean;
 }
 
+if (!process.env.SESSION_SECRET) {
+  throw new Error('SESSION_SECRET environment variable is required. Please set it in your .env.local file.');
+}
+
 export const sessionOptions: SessionOptions = {
-  password: process.env.SESSION_SECRET || 'complex_password_at_least_32_characters_long_for_security',
+  password: process.env.SESSION_SECRET,
   cookieName: 'library_session',
   cookieOptions: {
     secure: process.env.NODE_ENV === 'production',

@@ -32,7 +32,7 @@ export default function LoginPage() {
 
       router.push('/books');
       router.refresh();
-    } catch (err) {
+    } catch {
       setError('An error occurred. Please try again.');
       setLoading(false);
     }
@@ -92,13 +92,6 @@ export default function LoginPage() {
           >
             {loading ? 'Signing in...' : 'Sign in'}
           </button>
-
-          <div className="mt-4 text-xs text-gray-500 space-y-1">
-            <p className="font-semibold">Test Accounts:</p>
-            <p>Borrower: borrower@test.com / password123</p>
-            <p>Procurement: procurement@test.com / password123</p>
-            <p>Librarian: librarian@test.com / password123</p>
-          </div>
         </form>
       </div>
     </div>

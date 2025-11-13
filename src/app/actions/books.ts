@@ -75,7 +75,7 @@ export async function getUserCheckouts() {
 }
 
 export async function getAllCheckouts() {
-  const user = await requireRole(['librarian']);
+  await requireRole(['librarian']);
 
   const allCheckouts = await db
     .select({
@@ -87,6 +87,45 @@ export async function getAllCheckouts() {
     .where(eq(checkouts.status, 'active'));
 
   return allCheckouts;
+}
+
+export async function getBorrowingStats() {
+  const user = await requireAuth();
+
+  if (user.role !== 'borrower') {
+    return null;
+  }
+
+  // Get active checkouts count
+  const activeCheckouts = await db
+    .select()
+    .from(checkouts)
+    .where(
+      and(
+        eq(checkouts.userId, user.userId),
+        eq(checkouts.status, 'active')
+      )
+    );
+
+  // Get total borrowing history
+  const totalBorrowed = await db
+    .select()
+    .from(checkouts)
+    .where(eq(checkouts.userId, user.userId));
+
+  // Get returned books count
+  const returned = totalBorrowed.filter(c => c.status === 'returned');
+
+  // Get overdue books
+  const now = new Date();
+  const overdue = activeCheckouts.filter(c => new Date(c.dueDate) < now);
+
+  return {
+    activeCheckouts: activeCheckouts.length,
+    totalBorrowed: totalBorrowed.length,
+    totalReturned: returned.length,
+    overdueBooks: overdue.length,
+  };
 }
 
 export async function returnBook(checkoutId: number) {

@@ -1,9 +1,9 @@
 'use server';
 
 import { db } from '@/db';
-import { books } from '@/db/schema';
+import { books, checkouts } from '@/db/schema';
 import { requireRole } from '@/lib/auth';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 
 export async function addBook(formData: FormData) {
@@ -12,10 +12,11 @@ export async function addBook(formData: FormData) {
   const title = formData.get('title') as string;
   const author = formData.get('author') as string;
   const isbn = formData.get('isbn') as string;
-  const quantity = parseInt(formData.get('quantity') as string);
+  const quantityStr = formData.get('quantity') as string;
+  const quantity = parseInt(quantityStr, 10);
 
-  if (!title || !author || !isbn || !quantity) {
-    throw new Error('All fields are required');
+  if (!title || !author || !isbn || isNaN(quantity) || quantity < 0) {
+    throw new Error('All fields are required and quantity must be a valid positive number');
   }
 
   await db.insert(books).values({
@@ -28,8 +29,6 @@ export async function addBook(formData: FormData) {
 
   revalidatePath('/catalog');
   revalidatePath('/books');
-
-  return { success: true };
 }
 
 export async function updateBook(bookId: number, formData: FormData) {
@@ -38,15 +37,16 @@ export async function updateBook(bookId: number, formData: FormData) {
   const title = formData.get('title') as string;
   const author = formData.get('author') as string;
   const isbn = formData.get('isbn') as string;
-  const quantity = parseInt(formData.get('quantity') as string);
+  const quantityStr = formData.get('quantity') as string;
+  const quantity = parseInt(quantityStr, 10);
 
-  if (!title || !author || !isbn || !quantity) {
-    throw new Error('All fields are required');
+  if (!title || !author || !isbn || isNaN(quantity) || quantity < 0) {
+    throw new Error('All fields are required and quantity must be a valid positive number');
   }
 
   // Get current book to calculate available quantity change
   const [currentBook] = await db.select().from(books).where(eq(books.id, bookId)).limit(1);
-  
+
   if (!currentBook) {
     throw new Error('Book not found');
   }
@@ -67,7 +67,35 @@ export async function updateBook(bookId: number, formData: FormData) {
 
   revalidatePath('/catalog');
   revalidatePath('/books');
+}
 
-  return { success: true };
+export async function deleteBook(bookId: number) {
+  await requireRole(['procurement', 'librarian']);
+
+  // Check for active checkouts
+  const activeCheckouts = await db
+    .select()
+    .from(checkouts)
+    .where(and(
+      eq(checkouts.bookId, bookId),
+      eq(checkouts.status, 'active')
+    ));
+
+  if (activeCheckouts.length > 0) {
+    throw new Error('Cannot delete book with active checkouts. Please wait until all copies are returned.');
+  }
+
+  // Check if book exists
+  const [book] = await db.select().from(books).where(eq(books.id, bookId)).limit(1);
+
+  if (!book) {
+    throw new Error('Book not found');
+  }
+
+  // Delete the book
+  await db.delete(books).where(eq(books.id, bookId));
+
+  revalidatePath('/catalog');
+  revalidatePath('/books');
 }
 
